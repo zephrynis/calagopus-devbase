@@ -13,7 +13,7 @@ cp -rn /home/coder/.staged-extensions/. /workspace/.code-server/extensions/ 2>/d
 # extensions registry gets updated even on volumes that predate it.
 code-server --user-data-dir /workspace/.code-server \
     --extensions-dir /workspace/.code-server/extensions \
-    --install-extension /opt/calaforge-devtools.vsix >/dev/null 2>&1 || true
+    --install-extension /home/coder/calaforge-devtools.vsix >/dev/null 2>&1 || true
 
 bootstrap.sh >> /workspace/bootstrap.log 2>&1 &
 

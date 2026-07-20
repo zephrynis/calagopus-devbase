@@ -52,9 +52,9 @@ RUN mkdir -p /home/coder/.staged-extensions \
 # does not — code-server ignores unregistered dirs).
 COPY --chown=coder ide-extension /tmp/ide-extension
 RUN cd /tmp/ide-extension \
-    && npx --yes @vscode/vsce package --allow-missing-repository -o /opt/calaforge-devtools.vsix \
+    && npx --yes @vscode/vsce package --allow-missing-repository -o /home/coder/calaforge-devtools.vsix \
     && code-server --extensions-dir /home/coder/.staged-extensions \
-         --install-extension /opt/calaforge-devtools.vsix \
+         --install-extension /home/coder/calaforge-devtools.vsix \
     && rm -rf /tmp/ide-extension
 
 COPY --chmod=755 scripts/entrypoint.sh scripts/bootstrap.sh scripts/panel-backend scripts/panel-frontend scripts/panel-rs scripts/panel-start scripts/panel-stop scripts/panel-status /usr/local/bin/
