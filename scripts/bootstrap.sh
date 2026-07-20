@@ -65,7 +65,7 @@ log "building panel binary (the long step on first run; incremental afterwards).
 SQLX_OFFLINE=true cargo build -p panel-rs || { log "panel build FAILED"; exit 1; }
 
 seed() {
-    local PSQL="psql -h postgres -U panel -d panel -tA -c"
+    local PSQL="psql -h postgres -U panel -d panel -qtA -c"
     export PGPASSWORD="$POSTGRES_PASSWORD"
     local RS=./target/debug/panel-rs
 
