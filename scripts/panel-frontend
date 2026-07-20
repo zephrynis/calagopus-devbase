@@ -1,0 +1,4 @@
+#!/bin/bash
+# Run the Vite dev server on :5173 (proxies /api etc. to the backend on :8000).
+# Served publicly at https://<project>-panel.dev.zephmc.dev
+cd /workspace/panel/frontend && exec pnpm dev --host 0.0.0.0 "$@"

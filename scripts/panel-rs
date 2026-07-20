@@ -1,0 +1,10 @@
+#!/bin/bash
+# Shim for the in-tree panel binary (scaffolding etc.), e.g.:
+#   panel-rs extensions init
+#   panel-rs database-migrator create
+BIN=/workspace/panel/target/debug/panel-rs
+if [ ! -x "$BIN" ]; then
+    echo "panel-rs is not built yet — building it (this can take a while)..." >&2
+    ( cd /workspace/panel && SQLX_OFFLINE=true cargo build -p panel-rs ) || exit 1
+fi
+cd /workspace/panel && exec "$BIN" "$@"

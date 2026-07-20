@@ -1,0 +1,3 @@
+#!/bin/bash
+# Run the panel backend (compiles on first run). Listens on :8000.
+cd /workspace/panel && exec env SQLX_OFFLINE=true cargo run -p panel-rs "$@"
