@@ -161,7 +161,7 @@ seed_server() {
     # Paper egg via CLI import (Pterodactyl-format egg JSON imports natively)
     mkdir -p /tmp/seed-eggs
     curl -fsSL -o /tmp/seed-eggs/egg-paper.json \
-        https://raw.githubusercontent.com/pelican-eggs/eggs/master/game_eggs/minecraft/java/paper/egg-paper.json \
+        https://raw.githubusercontent.com/pterodactyl/game-eggs/main/minecraft/java/paper/egg-paper.json \
         || { log "WARN: Paper egg download failed, skipping server seed"; return 0; }
     if [ "$($PSQL 'SELECT count(*) FROM nest_eggs')" = "0" ]; then
         [ "$($PSQL 'SELECT count(*) FROM nests')" = "0" ] \
@@ -202,7 +202,7 @@ seed_server() {
     OWNER=$($PSQL 'SELECT uuid FROM users WHERE admin = true ORDER BY created LIMIT 1')
     ALLOC=$($PSQL "SELECT uuid FROM node_allocations WHERE node_uuid = '$NODE' ORDER BY port LIMIT 1")
     STARTUP=$(jq -r '.startup' /tmp/seed-eggs/egg-paper.json)
-    IMAGE=$(jq -r '.docker_images | to_entries[0].value' /tmp/seed-eggs/egg-paper.json)
+    IMAGE=$(jq -r '.docker_images | to_entries | (map(select(.key | test("21"))) + .)[0].value' /tmp/seed-eggs/egg-paper.json)
     [ -z "$EGG" ] || [ -z "$ALLOC" ] && { log "WARN: missing egg/allocation, skipping server seed"; return 0; }
 
     RESP=$(jq -n --arg node "$NODE" --arg owner "$OWNER" --arg egg "$EGG" --arg alloc "$ALLOC" \
