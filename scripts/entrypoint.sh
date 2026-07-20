@@ -3,7 +3,17 @@
 # bootstrap in the background (tail -f /workspace/bootstrap.log to watch it).
 set -u
 
-mkdir -p /workspace/.code-server/extensions /workspace/.claude /workspace/.cargo
+mkdir -p /workspace/.code-server/extensions /workspace/.code-server/User /workspace/.claude /workspace/.cargo
+
+# Default IDE settings, merged only when the key is absent — user edits win.
+# chat.disableAIFeatures hides VS Code's built-in AI chat (Claude Code is the
+# AI here).
+SETTINGS=/workspace/.code-server/User/settings.json
+[ -s "$SETTINGS" ] || echo '{}' > "$SETTINGS"
+if ! grep -q '"chat.disableAIFeatures"' "$SETTINGS"; then
+    jq '. + {"chat.disableAIFeatures": true}' "$SETTINGS" > "$SETTINGS.tmp" \
+        && mv "$SETTINGS.tmp" "$SETTINGS" || rm -f "$SETTINGS.tmp"
+fi
 
 # Seed staged extensions (Claude Code) into the persistent extensions dir.
 # -n never clobbers, so user-managed extension state survives.
