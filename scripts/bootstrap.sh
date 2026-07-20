@@ -145,6 +145,80 @@ WINGSEOF
     fi
 }
 
+# Second-stage seeding needs the panel's HTTP API (no CLI exists for servers):
+# log in with the seeded admin session, create allocations, import the Paper
+# egg, and create one test server — only when wings is actually reachable.
+seed_server() {
+    local PSQL="psql -h postgres -U panel -d panel -qtA -c"
+    export PGPASSWORD="$POSTGRES_PASSWORD"
+    local RS=./target/debug/panel-rs API=http://localhost:8000 JAR=/tmp/.seed-cookies
+
+    [ "$($PSQL 'SELECT count(*) FROM servers')" != "0" ] && return 0
+
+    # Paper egg via CLI import (Pterodactyl-format egg JSON imports natively)
+    mkdir -p /tmp/seed-eggs
+    curl -fsSL -o /tmp/seed-eggs/egg-paper.json \
+        https://raw.githubusercontent.com/pelican-eggs/eggs/master/game_eggs/minecraft/java/paper/egg-paper.json \
+        || { log "WARN: Paper egg download failed, skipping server seed"; return 0; }
+    if [ "$($PSQL 'SELECT count(*) FROM nest_eggs')" = "0" ]; then
+        [ "$($PSQL 'SELECT count(*) FROM nests')" = "0" ] \
+            && $RS nests create --author calaforge --name Seeded --json >/dev/null 2>&1
+        log "importing Paper egg..."
+        $RS nests mass-import --nest Seeded /tmp/seed-eggs 2>&1 | tail -1
+    fi
+
+    if ! curl -s -o /dev/null --max-time 5 http://wings:8443/; then
+        log "wings not reachable — enable wings, then restart the workspace pod to seed the Paper server"
+        return 0
+    fi
+
+    log "waiting for panel http..."
+    local n=0
+    until curl -s -o /dev/null --max-time 3 "$API/" 2>/dev/null || [ $n -ge 60 ]; do sleep 2; n=$((n+1)); done
+
+    rm -f "$JAR"
+    local LOGIN
+    LOGIN=$(jq -n --arg u "${SEED_ADMIN_USERNAME:-admin}" --arg p "$SEED_ADMIN_PASSWORD" '{user:$u,password:$p}' \
+        | curl -s -c "$JAR" -H 'content-type: application/json' -d @- "$API/api/auth/login/")
+    echo "$LOGIN" | grep -q '"completed"' || { log "WARN: seed login failed: $(echo "$LOGIN" | head -c 200)"; return 0; }
+
+    local NODE
+    NODE=$($PSQL "SELECT uuid FROM nodes WHERE name = 'wings' LIMIT 1")
+    if [ "$($PSQL 'SELECT count(*) FROM node_allocations')" = "0" ]; then
+        curl -s -b "$JAR" -H 'content-type: application/json' \
+            -d '{"ip":"0.0.0.0","ip_alias":null,"ports":[25565,25566,25567,25568,25569]}' \
+            "$API/api/admin/nodes/$NODE/allocations/" >/dev/null
+        log "seeded allocations 25565-25569"
+    fi
+
+    local EGG OWNER ALLOC STARTUP IMAGE RESP
+    EGG=$($PSQL 'SELECT uuid FROM nest_eggs LIMIT 1')
+    OWNER=$($PSQL 'SELECT uuid FROM users WHERE admin = true ORDER BY created LIMIT 1')
+    ALLOC=$($PSQL "SELECT uuid FROM node_allocations WHERE node_uuid = '$NODE' ORDER BY port LIMIT 1")
+    STARTUP=$(jq -r '.startup' /tmp/seed-eggs/egg-paper.json)
+    IMAGE=$(jq -r '.docker_images | to_entries[0].value' /tmp/seed-eggs/egg-paper.json)
+    [ -z "$EGG" ] || [ -z "$ALLOC" ] && { log "WARN: missing egg/allocation, skipping server seed"; return 0; }
+
+    RESP=$(jq -n --arg node "$NODE" --arg owner "$OWNER" --arg egg "$EGG" --arg alloc "$ALLOC" \
+        --arg startup "$STARTUP" --arg image "$IMAGE" '{
+        node_uuid:$node, owner_uuid:$owner, egg_uuid:$egg,
+        backup_configuration_uuid:null, allocation_uuid:$alloc, allocation_uuids:[],
+        start_on_completion:true, skip_installer:false, external_id:null,
+        name:"Paper (seeded)", description:"Seeded by Calaforge for extension testing",
+        limits:{cpu:200, memory:2048, memory_overhead:0, swap:0, disk:5120, io_weight:null},
+        pinned_cpus:[], startup:$startup, image:$image, timezone:null,
+        hugepages_passthrough_enabled:false, kvm_passthrough_enabled:false,
+        feature_limits:{allocations:5, databases:0, backups:0, schedules:5},
+        variables:[]}' \
+        | curl -s -b "$JAR" -H 'content-type: application/json' -d @- "$API/api/admin/servers/")
+    rm -f "$JAR"
+    if echo "$RESP" | grep -q '"server"'; then
+        log "seeded Paper server (installs via wings, port 25565)"
+    else
+        log "WARN: server seed failed: $(echo "$RESP" | head -c 250)"
+    fi
+}
+
 if [ -n "${SEED_ADMIN_PASSWORD:-}" ]; then
     seed || log "WARN: seeding failed (panel still usable, set up via OOBE)"
 else
@@ -158,6 +232,10 @@ if [ -f /workspace/.no-autostart ]; then
 else
     log "autostarting panel (opt out: touch /workspace/.no-autostart)"
     panel-start all
+fi
+
+if [ -n "${SEED_ADMIN_PASSWORD:-}" ] && [ ! -f /workspace/.no-autostart ]; then
+    seed_server || log "WARN: server seeding failed (create one via the panel UI)"
 fi
 
 log "=== bootstrap done. Control the panel from the Calaforge IDE tab, or panel-start/panel-stop. ==="
