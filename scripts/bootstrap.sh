@@ -83,6 +83,13 @@ seed() {
         log "users already exist, skipping admin seed"
     fi
 
+    # Public app URL (only replaces the untouched default, never a user edit)
+    if [ -n "${PROJECT_NAME:-}" ]; then
+        local PROJECT="${PROJECT_NAME#devenv-}"
+        $PSQL "UPDATE settings SET value = 'https://${PROJECT}-panel.${BASE_DOMAIN:-dev.zephmc.dev}' WHERE key = 'app::url' AND value = 'http://localhost:8000'" >/dev/null \
+            && log "app::url set to https://${PROJECT}-panel.${BASE_DOMAIN:-dev.zephmc.dev}"
+    fi
+
     # Location (no CLI for this — one row, schema-stable columns only)
     local LOC
     LOC=$($PSQL 'SELECT uuid FROM locations LIMIT 1')
