@@ -134,6 +134,9 @@ api:
   port: 8443
   upload_limit: 10240
 system:
+  # /tmp is shadowed inside dind (its entrypoint remounts it), so the install
+  # staging dir must live on the shared data volume.
+  tmp_directory: /var/lib/pterodactyl/tmp
   sftp:
     bind_port: 2022
 docker:
