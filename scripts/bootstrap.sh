@@ -101,9 +101,13 @@ seed() {
     fi
 
     # Wings credentials -> config file for the wings pod (it waits for this
-    # file; the CLI prints its JSON to stderr)
+    # file). Only on first seed: resetting the token later would cut off a
+    # running wings. The CLI prints pretty multiline JSON to stderr.
+    if [ -f /workspace/wings/config.yml ]; then
+        return 0
+    fi
     local TOK
-    TOK=$($RS nodes reset-token --node wings --json 2>&1 | grep -o '{.*}' | tail -1)
+    TOK=$($RS nodes reset-token --node wings --json 2>&1 | sed -n '/^{/,/^}/p')
     if [ -n "$TOK" ]; then
         mkdir -p /workspace/wings
         cat > /workspace/wings/config.yml <<WINGSEOF
