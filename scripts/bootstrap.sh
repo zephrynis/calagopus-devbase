@@ -87,7 +87,7 @@ seed() {
     local LOC
     LOC=$($PSQL 'SELECT uuid FROM locations LIMIT 1')
     if [ -z "$LOC" ]; then
-        LOC=$($PSQL "INSERT INTO locations (short_name, name, description) VALUES ('local', 'Local', 'Seeded by Calaforge') RETURNING uuid")
+        LOC=$($PSQL "INSERT INTO locations (name, description) VALUES ('Local', 'Seeded by Calaforge') RETURNING uuid")
         log "seeded location $LOC"
     fi
 
