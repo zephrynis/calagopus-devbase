@@ -61,5 +61,77 @@ log "running database migrations (compiles database-migrator, slow on first run)
 SQLX_OFFLINE=true cargo run -p database-migrator -- migrate \
     || { log "migrations FAILED"; exit 1; }
 
+log "building panel binary (the long step on first run; incremental afterwards)..."
+SQLX_OFFLINE=true cargo build -p panel-rs || { log "panel build FAILED"; exit 1; }
+
+seed() {
+    local PSQL="psql -h postgres -U panel -d panel -tA -c"
+    export PGPASSWORD="$POSTGRES_PASSWORD"
+    local RS=./target/debug/panel-rs
+
+    # Admin user (skip if any user exists — e.g. created via the panel's OOBE)
+    if [ "$($PSQL 'SELECT count(*) FROM users')" = "0" ]; then
+        log "seeding admin user '${SEED_ADMIN_USERNAME:-admin}'..."
+        $RS users create \
+            --username "${SEED_ADMIN_USERNAME:-admin}" \
+            --email "${SEED_ADMIN_EMAIL:-admin@zephmc.dev}" \
+            --name-first Dev --name-last Admin \
+            --password "$SEED_ADMIN_PASSWORD" \
+            --admin true --json 2>&1 | tail -1 \
+            && log "admin user ready (password is SEED_ADMIN_PASSWORD in the devenv-secrets Secret)"
+    else
+        log "users already exist, skipping admin seed"
+    fi
+
+    # Location (no CLI for this — one row, schema-stable columns only)
+    local LOC
+    LOC=$($PSQL 'SELECT uuid FROM locations LIMIT 1')
+    if [ -z "$LOC" ]; then
+        LOC=$($PSQL "INSERT INTO locations (short_name, name, description) VALUES ('local', 'Local', 'Seeded by Calaforge') RETURNING uuid")
+        log "seeded location $LOC"
+    fi
+
+    # Wings node (panel connects to the in-namespace wings service; enable the
+    # wings deployment via the project's kustomization replicas toggle)
+    if [ "$($PSQL 'SELECT count(*) FROM nodes')" = "0" ]; then
+        log "seeding wings node..."
+        $RS nodes create --location-uuid "$LOC" --name wings \
+            --url http://wings:8443 --sftp-port 2022 \
+            --memory 8192 --disk 51200 --deployment-enabled true --json 2>&1 | tail -1
+    fi
+
+    # Wings credentials -> config file for the wings pod (it waits for this
+    # file; the CLI prints its JSON to stderr)
+    local TOK
+    TOK=$($RS nodes reset-token --node wings --json 2>&1 | grep -o '{.*}' | tail -1)
+    if [ -n "$TOK" ]; then
+        mkdir -p /workspace/wings
+        cat > /workspace/wings/config.yml <<WINGSEOF
+uuid: $(echo "$TOK" | jq -r .uuid)
+token_id: $(echo "$TOK" | jq -r .token_id)
+token: $(echo "$TOK" | jq -r .token)
+remote: http://workspace:8000
+api:
+  host: 0.0.0.0
+  port: 8443
+  upload_limit: 10240
+system:
+  sftp:
+    bind_port: 2022
+docker:
+  socket: tcp://127.0.0.1:2375
+WINGSEOF
+        log "wrote wings config (node URL http://wings:8443)"
+    else
+        log "WARN: could not obtain wings node token; wings config not written"
+    fi
+}
+
+if [ -n "${SEED_ADMIN_PASSWORD:-}" ]; then
+    seed || log "WARN: seeding failed (panel still usable, set up via OOBE)"
+else
+    log "SEED_ADMIN_PASSWORD not set, skipping seeding"
+fi
+
 echo "$PANEL_VERSION" > .devenv-version
 log "=== bootstrap done. Run 'panel-backend' and 'panel-frontend' in terminals. ==="

@@ -8,7 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl git openssl sudo dumb-init \
         build-essential pkg-config libssl-dev clang cmake \
-        postgresql-client zip unzip ripgrep \
+        postgresql-client zip unzip ripgrep jq \
     && rm -rf /var/lib/apt/lists/*
 
 # Node 24 (panel requires >=24) + pnpm via corepack
