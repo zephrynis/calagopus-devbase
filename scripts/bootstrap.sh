@@ -107,6 +107,13 @@ seed() {
             --memory 8192 --disk 51200 --deployment-enabled true --json 2>&1 | tail -1
     fi
 
+    # Browsers reach wings same-origin through the panel's wings proxy (the
+    # ingress routes /wings-proxy on the panel host to the backend).
+    if [ -n "${PROJECT_NAME:-}" ]; then
+        local PROJECT="${PROJECT_NAME#devenv-}"
+        $PSQL "UPDATE nodes SET public_url = 'https://${PROJECT}-panel.${BASE_DOMAIN:-dev.zephmc.dev}/wings-proxy/' || uuid WHERE name = 'wings' AND public_url IS NULL" >/dev/null || true
+    fi
+
     # Wings credentials -> config file for the wings pod (it waits for this
     # file). Only on first seed: resetting the token later would cut off a
     # running wings. The CLI prints pretty multiline JSON to stderr.
