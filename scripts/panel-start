@@ -1,0 +1,33 @@
+#!/bin/bash
+# Start panel processes under pidfile management (used by the IDE control
+# panel and autostart). Usage: panel-start [backend|frontend|all]
+set -u
+RUN=/workspace/.run
+mkdir -p "$RUN"
+
+alive() { [ -f "$RUN/$1.pid" ] && kill -0 "-$(cat "$RUN/$1.pid")" 2>/dev/null; }
+
+start_backend() {
+    alive backend && { echo "backend already running (pid $(cat $RUN/backend.pid))"; return 0; }
+    # cargo run rebuilds incrementally when sources changed — restart after an
+    # edit = automatic rebuild. Logs: /workspace/panel-backend.log
+    setsid bash -c 'cd /workspace/panel && SQLX_OFFLINE=true exec cargo run -p panel-rs' \
+        >> /workspace/panel-backend.log 2>&1 &
+    echo $! > "$RUN/backend.pid"
+    echo "backend starting (pid $!, log /workspace/panel-backend.log)"
+}
+
+start_frontend() {
+    alive frontend && { echo "frontend already running (pid $(cat $RUN/frontend.pid))"; return 0; }
+    setsid bash -c 'cd /workspace/panel/frontend && exec pnpm dev --host 0.0.0.0' \
+        >> /workspace/panel-frontend.log 2>&1 &
+    echo $! > "$RUN/frontend.pid"
+    echo "frontend starting (pid $!, log /workspace/panel-frontend.log)"
+}
+
+case "${1:-all}" in
+    backend)  start_backend ;;
+    frontend) start_frontend ;;
+    all)      start_backend; start_frontend ;;
+    *) echo "usage: panel-start [backend|frontend|all]" >&2; exit 1 ;;
+esac

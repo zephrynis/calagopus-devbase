@@ -138,4 +138,12 @@ else
 fi
 
 echo "$PANEL_VERSION" > .devenv-version
-log "=== bootstrap done. Run 'panel-backend' and 'panel-frontend' in terminals. ==="
+
+if [ -f /workspace/.no-autostart ]; then
+    log "autostart disabled (/workspace/.no-autostart exists)"
+else
+    log "autostarting panel (opt out: touch /workspace/.no-autostart)"
+    panel-start all
+fi
+
+log "=== bootstrap done. Control the panel from the Calaforge IDE tab, or panel-start/panel-stop. ==="

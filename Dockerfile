@@ -41,12 +41,20 @@ ENV PATH="/home/coder/.cargo/bin:/home/coder/.local/bin:${PATH}"
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
 # Claude Code VS Code extension from Open VSX, staged into the image; the
-# entrypoint seeds it into the persistent extensions dir on first boot.
+# entrypoint seeds staged extensions into the persistent extensions dir.
 RUN mkdir -p /home/coder/.staged-extensions \
     && code-server --extensions-dir /home/coder/.staged-extensions \
          --install-extension anthropic.claude-code
 
-COPY --chmod=755 scripts/entrypoint.sh scripts/bootstrap.sh scripts/panel-backend scripts/panel-frontend scripts/panel-rs /usr/local/bin/
+# Calaforge devtools extension (in-IDE panel/wings controls), packaged here
+COPY --chown=coder ide-extension /tmp/ide-extension
+RUN cd /tmp/ide-extension \
+    && npx --yes @vscode/vsce package --allow-missing-repository -o /tmp/calaforge-devtools.vsix \
+    && code-server --extensions-dir /home/coder/.staged-extensions \
+         --install-extension /tmp/calaforge-devtools.vsix \
+    && rm -rf /tmp/ide-extension /tmp/calaforge-devtools.vsix
+
+COPY --chmod=755 scripts/entrypoint.sh scripts/bootstrap.sh scripts/panel-backend scripts/panel-frontend scripts/panel-rs scripts/panel-start scripts/panel-stop scripts/panel-status /usr/local/bin/
 
 EXPOSE 8080 5173 8000
 ENTRYPOINT ["dumb-init", "--", "entrypoint.sh"]

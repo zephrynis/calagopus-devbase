@@ -1,0 +1,33 @@
+{
+  "name": "calaforge-devtools",
+  "displayName": "Calaforge",
+  "description": "Controls for the Calagopus dev environment: panel, wings, and dev chores",
+  "version": "1.0.0",
+  "publisher": "zephrynis",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "main": "./extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "calaforge",
+          "title": "Calaforge",
+          "icon": "icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "calaforge": [
+        {
+          "type": "webview",
+          "id": "calaforge.controls",
+          "name": "Environment"
+        }
+      ]
+    }
+  }
+}

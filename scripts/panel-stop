@@ -1,0 +1,29 @@
+#!/bin/bash
+# Stop pidfile-managed panel processes. Usage: panel-stop [backend|frontend|all]
+set -u
+RUN=/workspace/.run
+
+stop_one() {
+    local name=$1 pid
+    if [ -f "$RUN/$name.pid" ]; then
+        pid=$(cat "$RUN/$name.pid")
+        if kill -0 "-$pid" 2>/dev/null; then
+            kill -TERM "-$pid" 2>/dev/null
+            for _ in $(seq 1 20); do kill -0 "-$pid" 2>/dev/null || break; sleep 0.5; done
+            kill -0 "-$pid" 2>/dev/null && kill -KILL "-$pid" 2>/dev/null
+            echo "$name stopped"
+        else
+            echo "$name was not running"
+        fi
+        rm -f "$RUN/$name.pid"
+    else
+        echo "$name has no pidfile (not started via panel-start)"
+    fi
+}
+
+case "${1:-all}" in
+    backend)  stop_one backend ;;
+    frontend) stop_one frontend ;;
+    all)      stop_one backend; stop_one frontend ;;
+    *) echo "usage: panel-stop [backend|frontend|all]" >&2; exit 1 ;;
+esac

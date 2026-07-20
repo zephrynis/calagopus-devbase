@@ -1,0 +1,21 @@
+#!/bin/bash
+# JSON status for the IDE control panel.
+set -u
+RUN=/workspace/.run
+
+state() {
+    local name=$1 pid="null" managed=false running=false
+    if [ -f "$RUN/$name.pid" ]; then
+        managed=true
+        pid=$(cat "$RUN/$name.pid")
+        kill -0 "-$pid" 2>/dev/null && running=true || pid="null"
+    fi
+    echo "{\"managed\":$managed,\"running\":$running,\"pid\":$pid}"
+}
+
+port() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && { exec 3>&-; echo true; } || echo false; }
+
+BOOT=$( [ -f /workspace/panel/.devenv-version ] && echo true || echo false )
+cat <<EOF
+{"backend":$(state backend),"frontend":$(state frontend),"port8000":$(port 8000),"port5173":$(port 5173),"bootstrapped":$BOOT}
+EOF

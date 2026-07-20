@@ -5,12 +5,10 @@ set -u
 
 mkdir -p /workspace/.code-server/extensions /workspace/.claude /workspace/.cargo
 
-# Seed the staged extensions (Claude Code) into the persistent extensions dir
-# once; after that the user owns it and can add/remove extensions freely.
-if [ ! -e /workspace/.code-server/.extensions-seeded ]; then
-    cp -rn /home/coder/.staged-extensions/. /workspace/.code-server/extensions/ || true
-    touch /workspace/.code-server/.extensions-seeded
-fi
+# Seed staged extensions (Claude Code, Calaforge devtools) into the
+# persistent extensions dir. -n never clobbers, so user-managed extension
+# state survives while newly staged extensions (or new versions) appear.
+cp -rn /home/coder/.staged-extensions/. /workspace/.code-server/extensions/ 2>/dev/null || true
 
 bootstrap.sh >> /workspace/bootstrap.log 2>&1 &
 
