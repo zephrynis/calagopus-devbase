@@ -194,7 +194,10 @@ seed_server() {
         log "seeded allocations 25565-25569"
     fi
 
-    local EGG OWNER ALLOC STARTUP IMAGE RESP
+    local EGG OWNER ALLOC STARTUP IMAGE VARS RESP
+    # Explicit variable values: unsent variables are not persisted by the API,
+    # which leaves {{PLACEHOLDERS}} unsubstituted in the startup command.
+    VARS=$(jq '[.variables[] | {env_variable, value: (.default_value // "" | tostring)}]' /tmp/seed-eggs/egg-paper.json)
     EGG=$($PSQL 'SELECT uuid FROM nest_eggs LIMIT 1')
     OWNER=$($PSQL 'SELECT uuid FROM users WHERE admin = true ORDER BY created LIMIT 1')
     ALLOC=$($PSQL "SELECT uuid FROM node_allocations WHERE node_uuid = '$NODE' ORDER BY port LIMIT 1")
@@ -212,7 +215,7 @@ seed_server() {
         pinned_cpus:[], startup:$startup, image:$image, timezone:null,
         hugepages_passthrough_enabled:false, kvm_passthrough_enabled:false,
         feature_limits:{allocations:5, databases:0, backups:0, schedules:5},
-        variables:[]}' \
+        variables:$vars}' --argjson vars "$VARS" \
         | curl -s -b "$JAR" -H 'content-type: application/json' -d @- "$API/api/admin/servers/")
     rm -f "$JAR"
     if echo "$RESP" | grep -q '"server"'; then
