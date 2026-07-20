@@ -46,13 +46,16 @@ RUN mkdir -p /home/coder/.staged-extensions \
     && code-server --extensions-dir /home/coder/.staged-extensions \
          --install-extension anthropic.claude-code
 
-# Calaforge devtools extension (in-IDE panel/wings controls), packaged here
+# Calaforge devtools extension (in-IDE panel/wings controls). The vsix is
+# kept in the image: the entrypoint installs it at boot, which updates the
+# extensions registry on volumes that predate the extension (a bare dir copy
+# does not — code-server ignores unregistered dirs).
 COPY --chown=coder ide-extension /tmp/ide-extension
 RUN cd /tmp/ide-extension \
-    && npx --yes @vscode/vsce package --allow-missing-repository -o /tmp/calaforge-devtools.vsix \
+    && npx --yes @vscode/vsce package --allow-missing-repository -o /opt/calaforge-devtools.vsix \
     && code-server --extensions-dir /home/coder/.staged-extensions \
-         --install-extension /tmp/calaforge-devtools.vsix \
-    && rm -rf /tmp/ide-extension /tmp/calaforge-devtools.vsix
+         --install-extension /opt/calaforge-devtools.vsix \
+    && rm -rf /tmp/ide-extension
 
 COPY --chmod=755 scripts/entrypoint.sh scripts/bootstrap.sh scripts/panel-backend scripts/panel-frontend scripts/panel-rs scripts/panel-start scripts/panel-stop scripts/panel-status /usr/local/bin/
 
