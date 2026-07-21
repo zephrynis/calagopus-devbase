@@ -202,7 +202,8 @@ seed_server() {
     OWNER=$($PSQL 'SELECT uuid FROM users WHERE admin = true ORDER BY created LIMIT 1')
     ALLOC=$($PSQL "SELECT uuid FROM node_allocations WHERE node_uuid = '$NODE' ORDER BY port LIMIT 1")
     STARTUP=$(jq -r '.startup' /tmp/seed-eggs/egg-paper.json)
-    IMAGE=$(jq -r '.docker_images | to_entries | (map(select(.key | test("21"))) + .)[0].value' /tmp/seed-eggs/egg-paper.json)
+    # First image = newest Java; current Paper requires the newest (26.1 -> Java 25)
+    IMAGE=$(jq -r '.docker_images | to_entries[0].value' /tmp/seed-eggs/egg-paper.json)
     [ -z "$EGG" ] || [ -z "$ALLOC" ] && { log "WARN: missing egg/allocation, skipping server seed"; return 0; }
 
     RESP=$(jq -n --arg node "$NODE" --arg owner "$OWNER" --arg egg "$EGG" --arg alloc "$ALLOC" \
@@ -217,12 +218,20 @@ seed_server() {
         feature_limits:{allocations:5, databases:0, backups:0, schedules:5},
         variables:$vars}' --argjson vars "$VARS" \
         | curl -s -b "$JAR" -H 'content-type: application/json' -d @- "$API/api/admin/servers/")
-    rm -f "$JAR"
     if echo "$RESP" | grep -q '"server"'; then
         log "seeded Paper server (installs via wings, port 25565)"
+        # Accept the Minecraft EULA so the first start doesn't stop on the
+        # prompt (standard for throwaway dev/test servers).
+        local SRV n=0
+        SRV=$(echo "$RESP" | jq -r '.server.uuid // empty')
+        if [ -n "$SRV" ]; then
+            until curl -sf -b "$JAR" -X POST --data-binary 'eula=true'                 "$API/api/client/servers/$SRV/files/write?file=eula.txt" >/dev/null 2>&1                 || [ $n -ge 30 ]; do sleep 6; n=$((n+1)); done
+            [ $n -lt 30 ] && log "accepted EULA" || log "WARN: could not write eula.txt (accept it in the panel UI)"
+        fi
     else
         log "WARN: server seed failed: $(echo "$RESP" | head -c 250)"
     fi
+    rm -f "$JAR"
 }
 
 if [ -n "${SEED_ADMIN_PASSWORD:-}" ]; then
