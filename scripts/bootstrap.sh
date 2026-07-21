@@ -141,6 +141,10 @@ system:
     bind_port: 2022
 docker:
   socket: tcp://127.0.0.1:2375
+  network:
+    # Nested bridge (dind) under flannel vxlan (1450): full-size frames
+    # blackhole on some CDNs without a lowered MTU.
+    network_mtu: 1400
 WINGSEOF
         log "wrote wings config (node URL http://wings:8443)"
     else
